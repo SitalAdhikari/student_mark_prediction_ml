@@ -3,7 +3,10 @@ import sys
 import pickle
 import numpy as np
 import pandas as pd
+import dill
 
+from sklearn.metrics import r2_score
+from sklearn.model_selection import GridSearchCV
 from src.exception import CustomException
 from src.logger import logging
 
@@ -26,28 +29,36 @@ def save_object(file_path, obj):
 
 
 def load_object(file_path):
-    """
-    Load a pickle object from file.
-    """
     try:
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"File not found at: {file_path}")
 
         with open(file_path, "rb") as file_obj:
-            return pickle.load(file_obj)
+            return dill.load(file_obj)
 
     except Exception as e:
         raise CustomException(e, sys)
 
 
-def evaluate_models(X_train, y_train, X_test, y_test, models):
+def evaluate_models(X_train, y_train, X_test, y_test, models, param):
     try:
-        from sklearn.metrics import r2_score
-
         report = {}
 
         for name, model in models.items():
-            logging.info(f"Training model: {name}")
+
+            para = param[name]
+
+            gs = GridSearchCV(
+                estimator=model,
+                param_grid=para,
+                cv=3,
+                n_jobs=-1,
+                verbose=1
+            )
+
+            gs.fit(X_train, y_train)
+
+            model = gs.best_estimator_
 
             model.fit(X_train, y_train)
 
@@ -57,7 +68,9 @@ def evaluate_models(X_train, y_train, X_test, y_test, models):
 
             report[name] = score
 
-            logging.info(f"{name} R2 Score: {score}")
+            logging.info(
+                f"{name} | Best Params: {gs.best_params_} | R2 Score: {score}"
+            )
 
         return report
 
